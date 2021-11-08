@@ -1,0 +1,15 @@
+String branchName = "staging"
+String gitCredentials = "MyGitHub"
+String repoUrl = "https://github.com/warhunt/hello-app.git"
+
+pipeline {
+    agent any 
+    stages {
+        stage('Build') { 
+            steps {
+                echo 'Cloning files from (branch: "' + branchName + '" )'
+                git branch: branchName, credentialsId: 	gitCredentials, url: repoUrl
+            }
+        }
+    }
+}
