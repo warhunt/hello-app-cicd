@@ -12,6 +12,12 @@ pipeline {
             steps {
                 echo 'Cloning files from (branch: "' + branchName + '" )'
                 git branch: branchName, credentialsId: 	gitCredentials, url: repoUrl
+        
+                echo 'Download Dockerfile and .dockerignore'
+                sshagent(credentials: [gitCredentials]) {
+                    sh "git archive --remote=https://github.com/warhunt/hello-app-ci.git --format=tar master /staging/Dockerfile | tar xf -"
+                }
+                
             }
         }
     }
