@@ -4,6 +4,9 @@ String repoUrl = "https://github.com/warhunt/hello-app.git"
 
 pipeline {
     agent any 
+    options {
+        skipDefaultCheckout(true)
+    }
     stages {
         stage('Build') { 
             steps {
