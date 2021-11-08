@@ -1,6 +1,7 @@
 String gitCredentials = "MyGitHub"
+String dockerHubCredentials = "MyDockerHub"
 String repoUrl = "https://github.com/warhunt/hello-app.git"
-String ciRepoUrl = "https://github.com/warhunt/hello-app-ci.git"
+String ciRepoUrl = "https://github.com/warhunt/hello-app-cicd.git"
 String branchName = "staging"
 pipeline {
     agent any 
@@ -26,12 +27,21 @@ pipeline {
                 }
                 
                 script {
-                    dockerImage = docker.build "${DOCKER_IMAGE_NAME}"
+                    dockerImage = docker.build "wolly8898/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+
+                    docker.withRegistry('', dockerHubCredentials ) { 
+                        dockerImage.push()
+                        dockerImage.push('latest')
+                    }
                 }
-                
             }
 
         }
+        //stage('Deploy'){
+        //    steps {
+
+        //    }
+        //}
         //stage('Remove Unused docker image') {
         //    steps{
         //    sh "docker rmi $DOCKER_IMAGE_NAME:$BUILD_NUMBER"
