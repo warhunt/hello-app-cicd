@@ -1,5 +1,6 @@
 String gitCredentials = "MyGitHub"
 String dockerHubCredentials = "MyDockerHub"
+String vmCredentials = "VagrantVM-192.168.60.6"
 String repoUrl = "https://github.com/warhunt/hello-app.git"
 String ciRepoUrl = "https://github.com/warhunt/hello-app-cicd.git"
 String branchName = "staging"
@@ -10,7 +11,27 @@ pipeline {
     }
     stages {
         stage('Build') { 
+            agent { label 'ansibleNode' }
             steps {
+                dir('cicd') {
+                    git branch: 'test', credentialsId: gitCredentials, url: ciRepoUrl
+
+                    dir('staging/ansible'){
+                        ansiblePlaybook(
+                            inventory: 'hosts.ini',
+                            playbook: 'playbook.yml',
+                            credentialsId: 'appTestSSH',
+                            limit: 'app-test',
+                            extraVars: [
+                                app_name: "app-test",
+                                docker_image_name: "wolly8898/hello-app-staging",
+                                app_port: "3000"
+                            ]
+                        )
+                    }
+                }
+                
+                /*
                 echo 'Cloning files from (branch: "' + branchName + '" )'
                 git branch: branchName, credentialsId: gitCredentials, url: repoUrl
 
@@ -34,19 +55,22 @@ pipeline {
                         dockerImage.push('latest')
                     }
                 }
+                */
             }
 
         }
-        //stage('Deploy'){
-        //    steps {
+        /*
+        stage('Deploy'){
+            steps {
 
-        //    }
-        //}
-        //stage('Remove Unused docker image') {
-        //    steps{
-        //    sh "docker rmi $DOCKER_IMAGE_NAME:$BUILD_NUMBER"
-        //    sh "docker rmi $DOCKER_IMAGE_NAME:latest"
-        //    }
-        //}
+            }
+        }
+        stage('Remove Unused docker image') {
+            steps{
+            sh "docker rmi $DOCKER_IMAGE_NAME:$BUILD_NUMBER"
+            sh "docker rmi $DOCKER_IMAGE_NAME:latest"
+            }
+        }
+        */
     }
 }
