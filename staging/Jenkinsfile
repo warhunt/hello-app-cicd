@@ -1,9 +1,3 @@
-String gitCredentials = "MyGitHub"
-String dockerHubCredentials = "MyDockerHub"
-String vmCredentials = "VagrantVM-192.168.60.6"
-String repoUrl = "https://github.com/warhunt/hello-app.git"
-String ciRepoUrl = "https://github.com/warhunt/hello-app-cicd.git"
-String branchName = "staging"
 pipeline {
     agent any 
     options {
@@ -11,66 +5,70 @@ pipeline {
     }
     stages {
         stage('Build') { 
-            agent { label 'ansibleNode' }
             steps {
-                dir('cicd') {
-                    git branch: 'test', credentialsId: gitCredentials, url: ciRepoUrl
+                echo 'Cloning files from repo'
+                git branch: 'staging', credentialsId: "${APP_REPO_CREDENTIALS}", url: "${APP_REPO_URL}"
 
-                    dir('staging/ansible'){
-                        ansiblePlaybook(
-                            inventory: 'hosts.ini',
-                            playbook: 'playbook.yml',
-                            credentialsId: 'appTestSSH',
-                            limit: 'app-test',
-                            extraVars: [
-                                app_name: "app-test",
-                                docker_image_name: "wolly8898/hello-app-staging",
-                                app_port: "3000"
-                            ]
-                        )
+                dir('cicd') {
+                    echo 'Cloning files from cicd'
+                    git branch: 'master', credentialsId: "${CICD_REPO_CREDENTIAL}", url: "${CICD_REPO_URL}"
+
+                    echo 'Move files to ws'
+                    dir('staging'){
+                        fileOperations([fileCopyOperation(
+                            excludes: 'Jenkinsfile',
+                            flattenFiles: true,
+                            includes: "*",
+                            targetLocation: "${WORKSPACE}/"
+                        )])
                     }
                 }
                 
-                /*
-                echo 'Cloning files from (branch: "' + branchName + '" )'
-                git branch: branchName, credentialsId: gitCredentials, url: repoUrl
-
-                dir('ci') {
-                    echo 'Cloning files from ci'
-                    git branch: 'master', credentialsId: gitCredentials, url: ciRepoUrl
-
-                    fileOperations([fileCopyOperation(
-                        excludes: 'staging/Jenkinsfile',
-                        flattenFiles: true,
-                        includes: "staging/*",
-                        targetLocation: "${WORKSPACE}/"
-                    )])
-                }
-                
+                echo 'Build docker image'
                 script {
-                    dockerImage = docker.build "wolly8898/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDENTIAL}", usernameVariable: 'USR', passwordVariable: 'PASSWD')]){
+                        dockerImage = docker.build "${USR}/${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}"
+                    }
+                }
+            }
 
-                    docker.withRegistry('', dockerHubCredentials ) { 
+        }
+
+        stage('Backup') {
+            steps{
+                echo 'Pull docker image to DockerHub'
+                script {
+                    docker.withRegistry('', "${DOCKER_HUB_CREDENTIAL}" ) { 
                         dockerImage.push()
                         dockerImage.push('latest')
                     }
                 }
-                */
             }
-
         }
-        /*
-        stage('Deploy'){
+        
+        stage('Deploy') {
+            agent { label "${ANSIBLE_AGENT_NODE}" }
             steps {
-
+                echo 'Deploy docker image to server'
+                dir('cicd') {
+                    git branch: 'master', credentialsId: "${CICD_REPO_CREDENTIAL}", url: "${CICD_REPO_URL}"
+                }
+                dir('cicd/ansible'){
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDENTIAL}", usernameVariable: 'USR', passwordVariable: 'PASSWD')]){
+                        ansiblePlaybook(
+                            inventory: 'hosts.ini',
+                            playbook: 'playbook.yml',
+                            credentialsId: "${TARGET_SERVER_CREDENCIAL}",
+                            limit: 'app-test',
+                            extraVars: [
+                                app_name: "${APP_NAME_ON_SERVER}",
+                                docker_image_name: "${USR}/${DOCKER_IMAGE_NAME}",
+                                app_port: "${APP_PORT_ON_SERVER}"
+                            ]
+                        )
+                    }
+                }
             }
         }
-        stage('Remove Unused docker image') {
-            steps{
-            sh "docker rmi $DOCKER_IMAGE_NAME:$BUILD_NUMBER"
-            sh "docker rmi $DOCKER_IMAGE_NAME:latest"
-            }
-        }
-        */
     }
 }
